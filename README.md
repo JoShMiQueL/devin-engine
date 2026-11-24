@@ -46,3 +46,14 @@ await engine.run(
 | `attachReasoning`, `rememberReasoning` | signed-thinking cache replay |
 | `openaiToWire` | OpenAI messages → `ChatHistoryItem[]` |
 | `resolveModel`, `SWE2_*`/`SWE21_*`/`ALL_TIERS` | model-id + effort → wire uid |
+
+## Ecosystem
+
+| Package | Role |
+| --- | --- |
+| `devin-core` | wire + auth + catalog — this package's only runtime dep |
+| **`devin-engine`** (this) | embeddable guarded-retry pipeline |
+| `devin-proxy` | standalone OpenAI-compatible proxy |
+| `devin-proxy-py` | Python original this port tracks |
+| `opencode-devin` | OpenCode v2 plugin |
+| `claude-devin` | Claude-compatible surface |
