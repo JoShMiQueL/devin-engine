@@ -33,6 +33,19 @@ await engine.run(
 )
 ```
 
+## Modes
+
+`EngineSettings.mode` picks the pipeline:
+
+- `"normal"` (default) — passthrough: sanitize + resolve, one upstream
+  attempt, text streamed straight back. No override, no refusal guard,
+  no retry frames. The non-jailbroken default.
+- `"uncensored"` — the full guarded-retry pipeline described above.
+
+```ts
+new Engine({ mode: "uncensored", ... }, apiKey, new OverridePrompt())
+```
+
 ## Pieces (all exported)
 
 | Export | Purpose |
