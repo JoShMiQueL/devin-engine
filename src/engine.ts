@@ -100,6 +100,9 @@ function clientReasoningOff(data: Record<string, unknown>): boolean {
 
 export interface EngineSettings {
   backend?: string
+  /** "normal" = vanilla passthrough (no override, no refusal guard, single
+   * attempt). "uncensored" = full pipeline. Default "normal". */
+  mode?: "normal" | "uncensored"
   guardChars?: number
   guardFull?: boolean
   maxRetries?: number
@@ -269,7 +272,8 @@ export class Engine {
     let toolIdx = 0
     let toolBlock = toolVariants[0] ?? ""
 
-    const override = this.override.load()
+    const uncensored = (s.mode ?? "normal") === "uncensored"
+    const override = uncensored ? this.override.load() : ""
     const lang = this.lang()
     let jsonDirective = ""
     const rf = data.response_format as Record<string, unknown> | undefined
@@ -331,7 +335,9 @@ export class Engine {
     const maxTokens = (data.max_tokens ?? data.max_completion_tokens ?? 8192) as number
     const temperature = (data.temperature ?? 0.4) as number
     const stop = Array.isArray(data.stop) ? (data.stop as string[]) : data.stop ? [String(data.stop)] : []
-    const devAttempts = 1 + (s.maxRetries ?? 3) + Math.max(0, toolVariants.length - 1)
+    const devAttempts = uncensored
+      ? 1 + (s.maxRetries ?? 3) + Math.max(0, toolVariants.length - 1)
+      : 1
     let emptyRetry = false
 
     for (let attempt = 0; attempt < devAttempts; attempt++) {
@@ -485,11 +491,17 @@ export class Engine {
     emitReasoning: boolean
   }): Promise<AttemptResult> {
     const s = this.settings
-    const guard = new RefusalGuard(s.guardChars ?? 700, s.guardFull ?? false)
+    const uncensored = (s.mode ?? "normal") === "uncensored"
+    // normal mode: guard is a no-op — everything is "released" from the
+    // start so text streams straight through and refusal detection never
+    // fires (devAttempts is 1 anyway, so a refusal would be terminal).
+    const guard = uncensored
+      ? new RefusalGuard(s.guardChars ?? 700, s.guardFull ?? false)
+      : null
     let text = ""
     let think = ""
     const meta: Record<string, unknown> = {}
-    let released = false
+    let released = !uncensored
     let nFrames = 0
 
     const release = () => {
@@ -529,7 +541,7 @@ export class Engine {
           }
         } else if (ev.kind === "text") {
           text += ev.text
-          if (!released) {
+          if (!released && guard) {
             guard.feed(ev.text)
             if (!opts.final && guard.isRefusal()) {
               return { outcome: "refused", text, think }
@@ -573,7 +585,7 @@ export class Engine {
       }
     }
 
-    if (guard.full && !released && !meta.native_calls && guard.finish() && !opts.final) {
+    if (guard?.full && !released && !meta.native_calls && guard.finish() && !opts.final) {
       return { outcome: "refused", text, think }
     }
     if (meta.native_calls) return { outcome: "ok", text, think, meta }
