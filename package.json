@@ -1,7 +1,7 @@
 {
   "name": "devin-engine",
-  "version": "0.0.1",
-  "description": "Embeddable compliance engine over devin-core \u00e2\u20ac\u201d guarded-retry pipeline, system-override injection, refusal guard, sanitize, pruning, model resolution. A class, not a server.",
+  "version": "0.0.3",
+  "description": "Embeddable compliance engine over devin-core â€” guarded-retry pipeline, system-override injection, refusal guard, sanitize, pruning, model resolution. A class, not a server.",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -38,7 +38,7 @@
     "url": "git+https://github.com/JoShMiQueL/devin-engine.git"
   },
   "dependencies": {
-    "devin-core": "file:../devin-core"
+    "devin-core": "0.0.3"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

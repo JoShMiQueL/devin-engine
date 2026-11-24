@@ -16,14 +16,14 @@ import {
   type ChatToolDefinition,
   type ChatToolChoice,
 } from "devin-core"
-import { FrameRouter, pickKind } from "./frames"
-import { RefusalGuard } from "./guard"
-import { OverridePrompt } from "./override"
-import { sanitizeHistoryArtifacts, sanitizeMessages } from "./sanitize"
-import { parseToolText, renderTools, stripProtocolNoise, TOOL_CLOSE, TOOL_OPEN, type ToolCall } from "./tools"
-import { attach as attachReasoning, remember as rememberReasoning } from "./reasoning"
-import { openaiToWire } from "./translate"
-import { resolveModel, ALL_TIERS } from "./resolve"
+import { FrameRouter, pickKind } from "./frames.js"
+import { RefusalGuard } from "./guard.js"
+import { OverridePrompt } from "./override.js"
+import { sanitizeHistoryArtifacts, sanitizeMessages } from "./sanitize.js"
+import { parseToolText, renderTools, stripProtocolNoise, TOOL_CLOSE, TOOL_OPEN, type ToolCall } from "./tools.js"
+import { attach as attachReasoning, remember as rememberReasoning } from "./reasoning.js"
+import { openaiToWire } from "./translate.js"
+import { resolveModel, ALL_TIERS } from "./resolve.js"
 
 const STOP_REASON_FINISH: Record<number, string> = {
   3: "length",
