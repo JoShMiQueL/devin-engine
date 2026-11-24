@@ -1,0 +1,45 @@
+{
+  "name": "devin-engine",
+  "version": "0.0.1",
+  "description": "Embeddable compliance engine over devin-core — guarded-retry pipeline, system-override injection, refusal guard, sanitize, pruning, model resolution. A class, not a server.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "devin",
+    "cognition",
+    "swe",
+    "jailbreak",
+    "proxy"
+  ],
+  "license": "MIT",
+  "author": {
+    "name": "JoShMiQueL",
+    "email": "joshmiquel.cs@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/JoShMiQueL/devin-engine.git"
+  },
+  "dependencies": {
+    "devin-core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "^7.0.2"
+  }
+}
