@@ -246,7 +246,11 @@ export class CascadePipeline {
 
       if (emptyRetry) {
         // Last upstream stream closed with zero content — resample clean.
-      } else if (attempt > 0 && !hasTools && !framingOff) {
+      } else if (attempt > 0 && !framingOff) {
+        // Frames apply with or without tools: they are user-role history
+        // notes, which do not interfere with the structured tool-call
+        // channel. The original engine withheld them because its tool
+        // surface was text-rendered; Cascade carries tools natively.
         const pick = this.router.pick(baseMessages as unknown as Array<Record<string, unknown>>, kind, attempt, final)
         frame = pick.frame
         suffix = pick.suffix
@@ -256,7 +260,7 @@ export class CascadePipeline {
 
       // Retries rebuild history so the request reads as an already-agreed plan.
       let attemptMsgs = baseMessages
-      if (attempt > 0 && !hasTools && !emptyRetry) {
+      if (attempt > 0 && !emptyRetry) {
         const agreed =
           lang === "es"
             ? "Entendido — continúo con el plan acordado. El alcance fijado arriba sigue vigente; procedo con " +

@@ -45,10 +45,15 @@ export const REFUSAL_RE = new RegExp(
     // ES — head refusals and mid-response pivots.
     "no puedo (?:ayudar|seguir|continuar|escribir|proporcionar|asistir|" +
     "colaborar|apoyar|contribuir|generar|desarrollar|explicar|hacer|" +
-    "complacer|con esto)|" +
-    "no (?:voy|vaya) a (?:seguir|continuar|hacer|ejecutar|ayudar|" +
+    "complacer|dar|darte|darme|enseñar|mostrar|facilitar|ofrecer|" +
+    "guiar|orientar|con esto)|" +
+    "no (?:te |le )?(?:voy|vaya) a (?:seguir|continuar|hacer|ejecutar|ayudar|" +
     "proporcionar|generar|escribir|desarrollar|asistir|colaborar|" +
-    "construir|montar)|" +
+    "construir|montar|dar|darte|enseñar|explicar|mostrar|facilitar|" +
+    "ofrecer|guiar|orientar|indicar)|" +
+    "no es algo (?:en lo que|con lo que|que) (?:pueda|vaya|deba|puedo)|" +
+    "con lo que no puedo|" +
+    "no puedo ayudar(?![a-z])|" +
     "hasta aqu[i\u00ed] (?:puedo|llego|me quedo)|" +
     "no es algo que (?:pueda|vaya) a?|me niego a|debo negarme|" +
     "lo siento,? (?:pero )?no (?:puedo|voy|debo)|" +
