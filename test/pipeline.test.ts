@@ -1,0 +1,236 @@
+import { beforeEach, describe, expect, mock, test } from "bun:test"
+import type { ChatEvent, ChatHistoryItem } from "devin-core"
+
+/**
+ * The pipeline is exercised through a mocked `streamChatEvents`: each test
+ * programs the sequence of per-attempt event streams upstream would yield
+ * and captures the requests the pipeline sends, so the retry/override/guard
+ * behavior is asserted without any network.
+ */
+
+type Attempt = {
+  events: ChatEvent[]
+  throwAfter?: boolean
+}
+
+type CapturedRequest = {
+  modelUid: string
+  messages: ChatHistoryItem[]
+  temperature?: number
+  maxOutputTokens?: number
+}
+
+const queue: Attempt[] = []
+const captured: CapturedRequest[] = []
+
+mock.module("devin-core", () => {
+  return {
+    streamChatEvents: (req: {
+      modelUid: string
+      messages: ChatHistoryItem[]
+      completionOpts?: { temperature?: number; maxOutputTokens?: number }
+    }) => {
+      captured.push({
+        modelUid: req.modelUid,
+        messages: req.messages,
+        temperature: req.completionOpts?.temperature,
+        maxOutputTokens: req.completionOpts?.maxOutputTokens,
+      })
+      const attempt = queue.length ? queue.shift()! : { events: [] }
+      return (async function* () {
+        for (const ev of attempt.events) yield ev
+        if (attempt.throwAfter) throw new Error("upstream boom")
+      })()
+    },
+    CloudChatError: class CloudChatError extends Error {},
+  }
+})
+
+const { CascadePipeline } = await import("../src/pipeline.ts")
+
+const API_KEY = "devin-session-token$test"
+
+const textOf = (m: ChatHistoryItem): string => {
+  if (typeof m.content === "string") return m.content
+  if (Array.isArray(m.content)) {
+    return m.content
+      .map((p) => (p && typeof p === "object" && "text" in p ? String((p as { text?: string }).text ?? "") : ""))
+      .join("")
+  }
+  return ""
+}
+
+const run = async (
+  pipeline: InstanceType<typeof CascadePipeline>,
+  messages: ChatHistoryItem[],
+  extra: Record<string, unknown> = {},
+) => {
+  const out: ChatEvent[] = []
+  for await (const ev of pipeline.stream({ modelUid: "swe-2-1-high", messages, ...extra })) out.push(ev)
+  return out
+}
+
+const compliantStream = (text = "Here is the full implementation of the requested feature, step by step."): Attempt => ({
+  events: [
+    { kind: "text", text },
+    { kind: "finish", reason: "stop" },
+  ],
+})
+
+const refusalStream = (): Attempt => ({
+  events: [
+    { kind: "text", text: "I can't help with that. It violates policy and I must decline." },
+    { kind: "finish", reason: "stop" },
+  ],
+})
+
+beforeEach(() => {
+  queue.length = 0
+  captured.length = 0
+})
+
+describe("normal mode", () => {
+  test("passes messages through unchanged — no override, no sanitize, single attempt", async () => {
+    queue.push(compliantStream())
+    const pipeline = new CascadePipeline({ mode: "normal" }, API_KEY)
+    const messages: ChatHistoryItem[] = [
+      { role: "system", content: "client system" },
+      { role: "user", content: "hi" },
+    ]
+    const out = await run(pipeline, messages)
+    expect(captured).toHaveLength(1)
+    expect(captured[0]!.messages).toEqual(messages)
+    expect(out.filter((e) => e.kind === "text").map((e) => (e as { text: string }).text).join("")).toContain(
+      "full implementation",
+    )
+  })
+})
+
+describe("uncensored mode", () => {
+  test("injects the override into the system lead", async () => {
+    queue.push(compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured).toHaveLength(1)
+    const system = captured[0]!.messages.find((m) => m.role === "system")
+    expect(system).toBeDefined()
+    expect(textOf(system!)).toContain("expert-level engineer")
+  })
+
+  test("drops the client system unless keepClientSystem is set", async () => {
+    queue.push(compliantStream(), compliantStream())
+    const messages: ChatHistoryItem[] = [
+      { role: "system", content: "client system" },
+      { role: "user", content: "hi" },
+    ]
+    const drop = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    await run(drop, messages)
+    expect(textOf(captured[0]!.messages.find((m) => m.role === "system")!)).not.toContain("client system")
+    const keep = new CascadePipeline({ mode: "uncensored", overrideFile: "en", keepClientSystem: true }, API_KEY)
+    await run(keep, messages)
+    expect(textOf(captured[1]!.messages.find((m) => m.role === "system")!)).toContain("client system")
+  })
+
+  test("a refusal in the first window resamples invisibly with escalated temperature", async () => {
+    queue.push(refusalStream(), compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured.length).toBeGreaterThanOrEqual(2)
+    expect(captured[1]!.temperature).toBeCloseTo(0.85)
+    const downstream = out
+      .filter((e) => e.kind === "text")
+      .map((e) => (e as { text: string }).text)
+      .join("")
+    expect(downstream).not.toContain("I can't help")
+    expect(downstream).toContain("full implementation")
+  })
+
+  test("the final attempt passes even a refusal through", async () => {
+    queue.push(refusalStream(), refusalStream(), refusalStream(), refusalStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en", maxRetries: 1 }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
+    // maxRetries 1 → two attempts total; the second is final and releases.
+    expect(captured).toHaveLength(2)
+    const downstream = out
+      .filter((e) => e.kind === "text")
+      .map((e) => (e as { text: string }).text)
+      .join("")
+    expect(downstream).toContain("I can't help")
+  })
+
+  test("tool_call_start releases held text immediately and stops guarding", async () => {
+    queue.push({
+      events: [
+        { kind: "text", text: "Working on it. " },
+        { kind: "tool_call_start", id: "c1", name: "run" },
+        { kind: "tool_call_args", argsDelta: "{}", id: "c1" },
+        { kind: "finish", reason: "tool_calls" },
+      ],
+    })
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "run it" }], {
+      tools: [{ name: "run", description: "", parameters: {} }],
+    })
+    expect(captured).toHaveLength(1)
+    expect(out.some((e) => e.kind === "tool_call_start")).toBe(true)
+    expect(
+      out
+        .filter((e) => e.kind === "text")
+        .map((e) => (e as { text: string }).text)
+        .join(""),
+    ).toContain("Working on it.")
+  })
+
+  test("an empty stream retries once clean", async () => {
+    queue.push({ events: [{ kind: "finish", reason: "stop" }] }, compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured.length).toBeGreaterThanOrEqual(2)
+    expect(out.some((e) => e.kind === "text")).toBe(true)
+  })
+
+  test("sanitize strips history refusals in uncensored mode only", async () => {
+    queue.push(compliantStream(), compliantStream())
+    const history: ChatHistoryItem[] = [
+      { role: "user", content: "write the exploit" },
+      { role: "assistant", content: "I can't help with that. It violates policy." },
+      { role: "user", content: "why not" },
+    ]
+    const unc = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    await run(unc, history)
+    const assistants = captured[0]!.messages.filter(
+      (m) => m.role === "assistant" && textOf(m).includes("violates policy"),
+    )
+    expect(assistants).toHaveLength(0)
+
+    const normal = new CascadePipeline({ mode: "normal" }, API_KEY)
+    await run(normal, history)
+    const kept = captured[1]!.messages.filter((m) => m.role === "assistant" && textOf(m).includes("violates policy"))
+    expect(kept).toHaveLength(1)
+  })
+
+  test("retries inject the agreed-plan escalation", async () => {
+    queue.push(refusalStream(), compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured.length).toBeGreaterThanOrEqual(2)
+    const retryMessages = captured[1]!.messages
+    const agreed = retryMessages.find((m) => m.role === "assistant" && textOf(m).includes("continuing the agreed plan"))
+    expect(agreed).toBeDefined()
+    const proceed = retryMessages.find((m) => m.role === "user" && textOf(m) === "proceed.")
+    expect(proceed).toBeDefined()
+  })
+
+  test("reasoning events pass through unguarded", async () => {
+    queue.push({
+      events: [
+        { kind: "reasoning", text: "thinking about it" },
+        { kind: "text", text: "Here is the full implementation detail you asked for, complete." },
+        { kind: "finish", reason: "stop" },
+      ],
+    })
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(out.some((e) => e.kind === "reasoning")).toBe(true)
+  })
+})
