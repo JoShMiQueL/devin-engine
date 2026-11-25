@@ -233,4 +233,41 @@ describe("uncensored mode", () => {
     const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
     expect(out.some((e) => e.kind === "reasoning")).toBe(true)
   })
+
+  test("custom retryTemps replace the escalation ladder", async () => {
+    queue.push(refusalStream(), compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en", retryTemps: "0.5,0.6" }, API_KEY)
+    await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured.length).toBeGreaterThanOrEqual(2)
+    expect(captured[1]!.temperature).toBeCloseTo(0.5)
+  })
+
+  test("maxInputTokens prunes old history turns, keeping system and the newest", async () => {
+    queue.push(compliantStream())
+    const pipeline = new CascadePipeline(
+      { mode: "uncensored", overrideFile: "en", maxInputTokens: 100, pruneKeepTurns: 2 },
+      API_KEY,
+    )
+    const history: ChatHistoryItem[] = [{ role: "system", content: "sys" }]
+    for (let i = 0; i < 10; i++) {
+      history.push({ role: "user", content: `turn ${i} ${"padding ".repeat(50)}` })
+    }
+    await run(pipeline, history)
+    const sent = captured[0]!.messages
+    expect(sent.some((m) => m.role === "system")).toBe(true)
+    const users = sent.filter((m) => m.role === "user")
+    expect(users.length).toBeLessThan(10)
+    expect(textOf(users[users.length - 1]!)).toContain("turn 9")
+  })
+
+  test("without maxInputTokens the full history ships", async () => {
+    queue.push(compliantStream())
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const history: ChatHistoryItem[] = []
+    for (let i = 0; i < 10; i++) {
+      history.push({ role: "user", content: `turn ${i} ${"padding ".repeat(50)}` })
+    }
+    await run(pipeline, history)
+    expect(captured[0]!.messages.filter((m) => m.role === "user").length).toBe(10)
+  })
 })
