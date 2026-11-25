@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.5](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.4...v0.0.5) (2026-11-25)
+
+
+### Features
+
+* extract CascadePipeline for wire-level consumers — the retry/override/guard/frame machinery over ChatHistoryItem[]/ChatEvent directly, so plugin hosts (opencode-devin) consume it without the OpenAI-shaped double translation; Engine stays as-is. Also bumps devin-core to ^0.0.5 ([#2](https://github.com/JoShMiQueL/devin-engine/issues/2)) ([be86ca6](https://github.com/JoShMiQueL/devin-engine/commit/be86ca631d759c5285e8310cc1c37ad298201539))
+
 ## [0.0.4] — 2026-11-24
 
 ### Added
