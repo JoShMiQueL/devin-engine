@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.7](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.6...v0.0.7) (2026-11-25)
+
+
+### Features
+
+* **engine:** catalog-driven resolution — Engine resolves model+effort through the live catalog via devin-core resolveModelUid, routing every family in the subscription; legacy tier table only as a no-catalog fallback ([#6](https://github.com/JoShMiQueL/devin-engine/issues/6)) ([dd1931b](https://github.com/JoShMiQueL/devin-engine/commit/dd1931bc623b1b16d9a1f737b2f8512382b12fa2))
+
 ## [0.0.6](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.5...v0.0.6) (2026-11-25)
 
 
