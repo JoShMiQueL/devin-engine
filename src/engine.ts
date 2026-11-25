@@ -270,8 +270,17 @@ export class Engine {
     messages = cleaned3
     droppedEmpty += droppedAfter
 
-    const tools: ChatToolDefinition[] =
-      data.tool_choice === "none" ? [] : ((data.tools as ChatToolDefinition[]) ?? [])
+    const rawTools = data.tool_choice === "none" ? [] : ((data.tools as Array<Record<string, unknown>>) ?? [])
+    const tools: ChatToolDefinition[] = rawTools.map((t) => {
+      // OpenAI shape is {type:"function", function:{name,description,parameters}};
+      // the wire encoder wants the flat {name,description,parameters}.
+      const fn = (t.function as Record<string, unknown> | undefined) ?? {}
+      return {
+        name: String(t.name ?? fn.name ?? ""),
+        description: String(t.description ?? fn.description ?? ""),
+        parameters: t.parameters ?? fn.parameters ?? {},
+      }
+    }).filter((t) => t.name)
     const { messages: pruned, dropped: droppedPruned } = this.pruneHistory(messages, tools)
     messages = pruned
     if (droppedPruned) {
