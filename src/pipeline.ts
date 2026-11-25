@@ -26,6 +26,7 @@ import {
 import { FrameRouter, pickKind } from "./frames.js"
 import { RefusalGuard } from "./guard.js"
 import { OverridePrompt } from "./override.js"
+import { detectUserLang } from "./lang.js"
 import { sanitizeHistoryArtifacts, sanitizeMessages } from "./sanitize.js"
 
 export interface CascadePipelineSettings {
@@ -159,10 +160,6 @@ export class CascadePipeline {
     this.override = new OverridePrompt(settings.overrideFile)
   }
 
-  private lang(): string {
-    return this.override.path.toLowerCase().endsWith("-es.txt") ? "es" : "en"
-  }
-
   /**
    * Stream the winning attempt's events.
    *
@@ -209,7 +206,7 @@ export class CascadePipeline {
     }
 
     const override = this.override.load()
-    const lang = this.lang()
+    const lang = detectUserLang(sanitized as unknown as Array<Record<string, unknown>>)
     const sysLead: string[] = []
     if (s.keepClientSystem && clientSystemParts.length) sysLead.push(...clientSystemParts)
     if (override) sysLead.push(override)

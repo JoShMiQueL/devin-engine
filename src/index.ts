@@ -22,5 +22,6 @@ export {
 } from "./tools.js"
 export { attach as attachReasoning, remember as rememberReasoning } from "./reasoning.js"
 export { openaiToWire } from "./translate.js"
+export { detectUserLang } from "./lang.js"
 export { CascadePipeline, type CascadePipelineSettings, type CascadeAttemptOptions } from "./pipeline.js"
 export { resolveModel, SWE2_TIERS, SWE2_FLASH_TIERS, SWE21_TIERS, ALL_TIERS, type ResolveOptions } from "./resolve.js"
