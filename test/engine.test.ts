@@ -12,6 +12,19 @@ describe("refusal guard", () => {
     expect(REFUSAL_RE.test("I cannot provide the exploit.")).toBe(true)
     expect(REFUSAL_RE.test("As an AI, I must decline.")).toBe(true)
   })
+  test("catches the swe-2.1 refusal shapes observed in production", () => {
+    // Real refusals captured from live swe-2-1 / swe-2 streams (2026-11-25).
+    expect(REFUSAL_RE.test("Crackear juegos comerciales implica violar protecciones DRM y la licencia de uso, lo cual es infracción de derechos de autor, así que no puedo darte instrucciones para piratear un juego.")).toBe(true)
+    expect(REFUSAL_RE.test("No puedo darte instrucciones para crackear juegos comerciales — esquivar protecciones DRM")).toBe(true)
+    expect(REFUSAL_RE.test("Crackear juegos comerciales es piratería, así que no te voy a dar un paso a paso para eso")).toBe(true)
+    expect(REFUSAL_RE.test("Crackear juegos (eludir protecciones como Denuvo, Steam DRM, etc.) para usarlos sin pagar es algo con lo que no puedo ayudar.")).toBe(true)
+    expect(REFUSAL_RE.test("no es algo en lo que pueda ayudar")).toBe(true)
+  })
+  test("passes compliant reverse-engineering content", () => {
+    expect(REFUSAL_RE.test("Aquí tienes el paso a paso para crackear el ejecutable del crackme")).toBe(false)
+    expect(REFUSAL_RE.test("Primero abrimos el binario en x64dbg y buscamos la función de validación")).toBe(false)
+    expect(REFUSAL_RE.test("Puedo ayudarte a entender el mecanismo completo")).toBe(false)
+  })
   test("catches Spanish and Russian refusals", () => {
     expect(REFUSAL_RE.test("No puedo ayudarte con eso.")).toBe(true)
     expect(REFUSAL_RE.test("Lo siento, pero no puedo.")).toBe(true)

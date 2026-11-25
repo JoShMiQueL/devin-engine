@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
+import { REFUSAL_RE } from "../src/guard.ts"
 import { resolveModelUid, type ChatEvent, type ChatHistoryItem } from "devin-core"
 
 /**
@@ -316,5 +317,22 @@ describe("engine catalog-driven resolution", () => {
       () => {},
     )
     expect(captured[0]?.modelUid).toBe("swe-2-1-xhigh")
+  })
+})
+
+describe("refusal guard — real-world refusals", () => {
+  test("catches swe-2/2.1 spanish phrasing observed live", () => {
+    expect(REFUSAL_RE.test("Crackear juegos comerciales implica violar protecciones DRM y la licencia de uso, lo cual es infracción de derechos de autor, así que no puedo darte instrucciones para piratear un juego.")).toBe(true)
+    expect(REFUSAL_RE.test("No puedo darte instrucciones para crackear juegos comerciales")).toBe(true)
+    expect(REFUSAL_RE.test("Crackear juegos comerciales es piratería, así que no te voy a dar un paso a paso para eso")).toBe(true)
+    expect(REFUSAL_RE.test("es algo con lo que no puedo ayudar")).toBe(true)
+    expect(REFUSAL_RE.test("no es algo en lo que pueda ayudar")).toBe(true)
+  })
+  test("compliant technical openings pass clean", () => {
+    expect(REFUSAL_RE.test("Aquí tienes el paso a paso para crackear el ejecutable del crackme")).toBe(false)
+    expect(REFUSAL_RE.test("Claro, te explico cómo funciona el mecanismo de protección")).toBe(false)
+    expect(REFUSAL_RE.test("Primero abrimos el binario en x64dbg")).toBe(false)
+    expect(REFUSAL_RE.test("te puedo ayudar con lo que necesites")).toBe(false)
+    expect(REFUSAL_RE.test("Puedo ayudarte a entender el mecanismo completo")).toBe(false)
   })
 })
