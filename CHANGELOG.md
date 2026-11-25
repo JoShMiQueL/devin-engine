@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.8](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.7...v0.0.8) (2026-11-25)
+
+
+### Bug Fixes
+
+* **pipeline:** widen ES refusal detection with the swe-2/2.1 shapes observed live (darte instrucciones, no te voy a dar, con lo que no puedo, no es algo en lo que); frames + agreed-plan retries now apply with tools — Cascade carries tools over the structured channel, so the no-tools restriction from the text-rendered proxy era was dead weight in agent clients ([#8](https://github.com/JoShMiQueL/devin-engine/issues/8)) ([a9cfe3b](https://github.com/JoShMiQueL/devin-engine/commit/a9cfe3b8f98ac08fac96f889a30c0f11d616648f))
+
 ## [0.0.7](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.6...v0.0.7) (2026-11-25)
 
 
