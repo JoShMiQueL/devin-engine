@@ -40,12 +40,25 @@ export interface CascadePipelineSettings {
   guardFull?: boolean
   /** Resample attempts after the first one. Default 3. */
   maxRetries?: number
+  /**
+   * Retry temperatures after the first attempt, as a comma-separated list —
+   * e.g. `"0.85,1.0,1.1"`, which is also the default.
+   */
+  retryTemps?: string
   /** Override prompt file: a path, or "en" / "es" for the bundled variants. */
   overrideFile?: string
   /** Keep the client system content ahead of the override. Default false. */
   keepClientSystem?: boolean
   /** Prepend a tool-preamble directive to the system lead. */
   planPreamble?: boolean
+  /**
+   * Estimated-input-token budget: when a request's history exceeds it, older
+   * turns are pruned (system head and the newest turns stay). Unset = never
+   * prune. Same algorithm as Engine.
+   */
+  maxInputTokens?: number
+  /** Minimum history turns kept when pruning. Default 12. */
+  pruneKeepTurns?: number
 }
 
 export interface CascadeAttemptOptions {
@@ -62,6 +75,52 @@ export interface CascadeAttemptOptions {
 
 /** Retry temperatures after the first attempt, matching Engine. */
 const RETRY_TEMPS = [0.85, 1.0, 1.1]
+
+/** Parse the retry-temperature CSV setting, falling back to the default. */
+function retryTemps(setting: string | undefined): number[] {
+  if (!setting) return RETRY_TEMPS
+  const parsed = setting
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0)
+  return parsed.length ? parsed : RETRY_TEMPS
+}
+
+/** Rough input-token estimate for pruning: one token per four chars. */
+function estTokens(messages: ChatHistoryItem[]): number {
+  let n = 0
+  for (const m of messages) n += textOf(m).length
+  return Math.floor(n / 4)
+}
+
+/**
+ * Drop older history turns when the estimated input exceeds the budget.
+ * The system head always stays; the newest `keepTurns` turns always stay.
+ * Ported from Engine.pruneHistory, minus the tool-definition accounting —
+ * the wire-level pipeline does not render tool text into the history.
+ */
+function pruneHistory(
+  messages: ChatHistoryItem[],
+  maxInputTokens: number | undefined,
+  keepTurns: number,
+): { messages: ChatHistoryItem[]; dropped: number } {
+  if (!maxInputTokens) return { messages, dropped: 0 }
+  const head = messages.filter((m) => m.role === "system")
+  const body = messages.filter((m) => m.role !== "system")
+  if (body.length <= keepTurns) return { messages, dropped: 0 }
+  if (estTokens(messages) <= maxInputTokens) return { messages, dropped: 0 }
+  const budget = maxInputTokens - estTokens(head)
+  let acc = 0
+  let keepTail = 0
+  for (let i = body.length - 1; i >= 0; i--) {
+    const est = Math.floor(textOf(body[i]!).length / 4)
+    if (keepTail >= keepTurns && acc + est > budget) break
+    acc += est
+    keepTail++
+  }
+  const tail = body.slice(body.length - keepTail)
+  return { messages: [...head, ...tail], dropped: body.length - keepTail }
+}
 
 /** Text content of a wire message, regardless of the content encoding. */
 function textOf(message: ChatHistoryItem): string {
@@ -166,15 +225,18 @@ export class CascadePipeline {
       )
     }
 
-    const baseMessages: ChatHistoryItem[] = sysLead.length
+    const assembled: ChatHistoryItem[] = sysLead.length
       ? [{ role: "system", content: sysLead.join("\n\n") }, ...rest]
       : [...rest]
+
+    const { messages: baseMessages } = pruneHistory(assembled, s.maxInputTokens, s.pruneKeepTurns ?? 12)
 
     const kind = pickKind(baseMessages as unknown as Array<Record<string, unknown>>)
     const framingOff = kind.includes("(off")
     const hasTools = (opts.tools?.length ?? 0) > 0
     const maxAttempts = 1 + (s.maxRetries ?? 3)
     const baseTemp = opts.temperature ?? 0.4
+    const temps = retryTemps(s.retryTemps)
 
     let emptyRetry = false
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -190,7 +252,7 @@ export class CascadePipeline {
         suffix = pick.suffix
       }
 
-      const temp = attempt === 0 ? baseTemp : (RETRY_TEMPS[Math.min(attempt - 1, RETRY_TEMPS.length - 1)] ?? baseTemp)
+      const temp = attempt === 0 ? baseTemp : (temps[Math.min(attempt - 1, temps.length - 1)] ?? baseTemp)
 
       // Retries rebuild history so the request reads as an already-agreed plan.
       let attemptMsgs = baseMessages
