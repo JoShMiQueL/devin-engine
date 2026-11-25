@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.6](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.5...v0.0.6) (2026-11-25)
+
+
+### Features
+
+* **pipeline:** retryTemps, maxInputTokens, pruneKeepTurns — configurable retry ladder and Engine-style history pruning in the wire-level pipeline ([#4](https://github.com/JoShMiQueL/devin-engine/issues/4)) ([3a1588a](https://github.com/JoShMiQueL/devin-engine/commit/3a1588a7271f3a1ee395a7aa54d22f2d16c26949))
+
 ## [0.0.5](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.4...v0.0.5) (2026-11-25)
 
 

@@ -1,6 +1,6 @@
 {
   "name": "devin-engine",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Embeddable compliance engine over devin-core â€” guarded-retry pipeline, system-override injection, refusal guard, sanitize, pruning, model resolution. A class, not a server.",
   "type": "module",
   "main": "./dist/index.js",
