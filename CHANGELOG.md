@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.11](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.10...v0.0.11) (2026-11-25)
+
+
+### Bug Fixes
+
+* flatten OpenAI-shaped tools before wire encoding — clients send {type:"function",function:{name,...}} but the wire encoder wants flat {name,description,parameters}; the passthrough crashed encodeString(undefined), killing every tool-carrying request through the proxy with a TypeError. Verified live: tool calls now stream correctly through the OpenAI-compatible surface ([#14](https://github.com/JoShMiQueL/devin-engine/issues/14)) ([cd6ec99](https://github.com/JoShMiQueL/devin-engine/commit/cd6ec997cbc44f9902bb6732dce8f1523d69b95a))
+* flatten OpenAI-shaped tools before wire encoding — clients send {type:"function",function:{name,...}} but the wire encoder wants flat {name,description,parameters}; the passthrough crashed encodeString(undefined), killing every tool-carrying request through the proxy with a TypeError. Verified live: tool calls now stream correctly through the OpenAI-compatible surface ([#14](https://github.com/JoShMiQueL/devin-engine/issues/14)) ([e143b27](https://github.com/JoShMiQueL/devin-engine/commit/e143b27cc98b46ab1ce3327688bcb7ec164ab742))
+
 ## [0.0.10](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.9...v0.0.10) (2026-11-25)
 
 
