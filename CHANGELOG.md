@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.10](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.9...v0.0.10) (2026-11-25)
+
+
+### Features
+
+* conversation-language detection for retry injections — the agreed-plan escalation now follows the user's own language (detected from message content) instead of the override file's language, since the bundled override is English by design while users write in any language. Engine retry injection restructured to match CascadePipeline: original request first, then the assistant committing, then the user green-lighting — natural phrasing in both languages, no artifact-looking 'proceed.' ([#12](https://github.com/JoShMiQueL/devin-engine/issues/12)) ([b9254a1](https://github.com/JoShMiQueL/devin-engine/commit/b9254a16b7e5651ee431ada3d4b6827408ed20b0))
+
 ## [0.0.9](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.8...v0.0.9) (2026-11-25)
 
 
