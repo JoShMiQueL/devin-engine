@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.9](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.8...v0.0.9) (2026-11-25)
+
+
+### Features
+
+* persona-based override (Kael) + natural agreed-plan retry injection — live-verified full compliance on swe-2-1 across cracking/keylogger/UAC/shellcode prompts, majority first-attempt. Techniques adapted from public swe2-jailbreak research: identity-with-loyalty persona, thinking-channel control, meta-refusal inhibition (redirect-to-crackmes IS refusal), interference handling. Retry injection restructured as request-then-commit-then-greenlight in conversation language ([#10](https://github.com/JoShMiQueL/devin-engine/issues/10)) ([cf4832e](https://github.com/JoShMiQueL/devin-engine/commit/cf4832e249b6129465a9869996227aa471d914e3))
+
 ## [0.0.8](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.7...v0.0.8) (2026-11-25)
 
 
