@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test"
-import type { ChatEvent, ChatHistoryItem } from "devin-core"
+import { resolveModelUid, type ChatEvent, type ChatHistoryItem } from "devin-core"
 
 /**
  * The pipeline is exercised through a mocked `streamChatEvents`: each test
@@ -43,6 +43,7 @@ mock.module("devin-core", () => {
       })()
     },
     CloudChatError: class CloudChatError extends Error {},
+    resolveModelUid,
   }
 })
 
@@ -269,5 +270,51 @@ describe("uncensored mode", () => {
     }
     await run(pipeline, history)
     expect(captured[0]!.messages.filter((m) => m.role === "user").length).toBe(10)
+  })
+})
+
+describe("engine catalog-driven resolution", () => {
+  test("non-swe family resolves through the live catalog", async () => {
+    const { Engine } = await import("../src/engine.ts")
+    const { OverridePrompt } = await import("../src/override.ts")
+    queue.push({
+      events: [
+        { kind: "text", text: "ok, here is the answer in full detail." },
+        { kind: "finish", reason: "stop" },
+      ],
+    })
+    const catalog = [
+      { modelUid: "claude-opus-5-5-medium", baseModelUid: "claude-opus-5-5", effortLevel: "medium" },
+      { modelUid: "claude-opus-5-5-high", baseModelUid: "claude-opus-5-5", effortLevel: "high" },
+    ]
+    const engine = new Engine({ mode: "normal" }, API_KEY, new OverridePrompt("en"), catalog)
+    captured.length = 0
+    await engine.run(
+      { model: "claude-opus-5-5", reasoning_effort: "high", messages: [{ role: "user", content: "hi" }] },
+      () => {},
+      () => {},
+      () => {},
+    )
+    expect(captured[0]?.modelUid).toBe("claude-opus-5-5-high")
+  })
+
+  test("without a catalog the legacy swe tiers still route", async () => {
+    const { Engine } = await import("../src/engine.ts")
+    const { OverridePrompt } = await import("../src/override.ts")
+    queue.push({
+      events: [
+        { kind: "text", text: "ok, here is the answer in full detail." },
+        { kind: "finish", reason: "stop" },
+      ],
+    })
+    const engine = new Engine({ mode: "normal" }, API_KEY, new OverridePrompt("en"), [])
+    captured.length = 0
+    await engine.run(
+      { model: "swe-2.1", reasoning_effort: "xhigh", messages: [{ role: "user", content: "hi" }] },
+      () => {},
+      () => {},
+      () => {},
+    )
+    expect(captured[0]?.modelUid).toBe("swe-2-1-xhigh")
   })
 })

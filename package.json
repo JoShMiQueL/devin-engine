@@ -38,7 +38,7 @@
     "url": "git+https://github.com/JoShMiQueL/devin-engine.git"
   },
   "dependencies": {
-    "devin-core": "^0.0.5"
+    "devin-core": "^0.0.7"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

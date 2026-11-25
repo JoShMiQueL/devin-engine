@@ -12,9 +12,11 @@ import { randomUUID } from "node:crypto"
 import {
   streamChatEvents,
   CloudChatError,
+  resolveModelUid,
   type ChatHistoryItem,
   type ChatToolDefinition,
   type ChatToolChoice,
+  type ModelCatalogEntry,
 } from "devin-core"
 import { FrameRouter, pickKind } from "./frames.js"
 import { RefusalGuard } from "./guard.js"
@@ -139,11 +141,27 @@ export class Engine {
     private settings: EngineSettings,
     private apiKey: string,
     private override: OverridePrompt,
-    private catalog?: Array<{ uid: string }>,
+    private catalog?: ReadonlyArray<Pick<ModelCatalogEntry, "modelUid" | "baseModelUid" | "effortLevel" | "disabled">>,
   ) {}
 
   private catalogUids(): Set<string> {
-    return new Set((this.catalog ?? []).map((c) => c.uid))
+    return new Set((this.catalog ?? []).map((c) => c.modelUid))
+  }
+
+  /**
+   * The catalog as resolution needs it: minus the lanes the account has
+   * disabled. Accepts both the core shape (`modelUid`) and the proxy's
+   * CLI-catalog shape (`uid`) so either source can seed it.
+   */
+  private routableCatalog(): Array<Pick<ModelCatalogEntry, "modelUid" | "baseModelUid" | "effortLevel">> {
+    return (this.catalog ?? [])
+      .filter((c) => !c.disabled)
+      .map((c) => ({
+        modelUid: c.modelUid ?? (c as unknown as { uid?: string }).uid!,
+        baseModelUid: c.baseModelUid,
+        effortLevel: c.effortLevel,
+      }))
+      .filter((c) => typeof c.modelUid === "string" && c.modelUid.length > 0)
   }
 
   private lang(): string {
@@ -211,14 +229,32 @@ export class Engine {
     const clientOff = clientReasoningOff(data)
     const rawModel = String(data.model ?? "")
     const effort = String(data.reasoning_effort ?? "")
-    let model = resolveModel(rawModel, {
-      effort,
-      allowed: s.allowedModels ?? ALL_TIERS,
-      default: s.defaultModel ?? "swe-2-high",
-    })
-    const reqUid = rawModel.trim().toLowerCase()
-    if (s.allowPaid && !(s.allowedModels ?? ALL_TIERS).includes(model) && this.catalogUids().has(reqUid)) {
-      model = reqUid
+    const catalog = this.routableCatalog()
+    let model: string
+    if (catalog.length) {
+      // Catalog-driven resolution: every family in the subscription routes,
+      // effort picks the lane. This is the same rule the opencode plugin
+      // applies — no hardcoded tier table.
+      model = resolveModelUid(rawModel, catalog, effort || undefined)
+      // An explicit allowlist still constrains what the proxy serves: a uid
+      // that resolves outside it falls back to the default.
+      const allowed = s.allowedModels
+      if (allowed?.length && !allowed.includes(model)) {
+        model = resolveModelUid(s.defaultModel ?? rawModel, catalog, effort || undefined)
+      }
+    } else {
+      // No catalog yet (prefetch in flight or fetch failed): the legacy tier
+      // table keeps the SWE lanes routable, which is strictly better than
+      // refusing every request.
+      model = resolveModel(rawModel, {
+        effort,
+        allowed: s.allowedModels ?? ALL_TIERS,
+        default: s.defaultModel ?? "swe-2-high",
+      })
+      const reqUid = rawModel.trim().toLowerCase()
+      if (s.allowPaid && !(s.allowedModels ?? ALL_TIERS).includes(model) && this.catalogUids().has(reqUid)) {
+        model = reqUid
+      }
     }
 
     let messages = (data.messages as Array<Record<string, unknown>>) ?? []
