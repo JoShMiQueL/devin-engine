@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.0.12](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.11...v0.0.12) (2026-11-26)
+
+
+### Bug Fixes
+
+* surface non-transient upstream errors instead of resampling ([#16](https://github.com/JoShMiQueL/devin-engine/issues/16)) ([851baa2](https://github.com/JoShMiQueL/devin-engine/commit/851baa2d8d69236a009884f67abbc8abe974f92e))
+
 ## [0.0.11](https://github.com/JoShMiQueL/devin-engine/compare/v0.0.10...v0.0.11) (2026-11-25)
 
 
