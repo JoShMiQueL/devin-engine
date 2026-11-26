@@ -23,6 +23,7 @@ import { RefusalGuard } from "./guard.js"
 import { OverridePrompt } from "./override.js"
 import { detectUserLang } from "./lang.js"
 import { sanitizeHistoryArtifacts, sanitizeMessages } from "./sanitize.js"
+import { transientUpstream } from "./pipeline.js"
 import { parseToolText, renderTools, stripProtocolNoise, TOOL_CLOSE, TOOL_OPEN, type ToolCall } from "./tools.js"
 import { attach as attachReasoning, remember as rememberReasoning } from "./reasoning.js"
 import { openaiToWire } from "./translate.js"
@@ -609,7 +610,7 @@ export class Engine {
       if (collectedCalls.length) meta.native_calls = collectedCalls
     } catch (e) {
       const isConnErr = e instanceof CloudChatError
-      if (!released && !opts.final) {
+      if (!released && !opts.final && !(isConnErr && !transientUpstream(e))) {
         return {
           outcome: !text && !think ? "empty" : "refused",
           text,
