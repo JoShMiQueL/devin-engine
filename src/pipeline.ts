@@ -29,6 +29,8 @@ import { OverridePrompt } from "./override.js"
 import { detectUserLang } from "./lang.js"
 import { sanitizeHistoryArtifacts, sanitizeMessages } from "./sanitize.js"
 
+export const transientUpstream = (e: CloudChatError) => e.statusCode === 401 || e.statusCode === 408 || (e.statusCode ?? 500) >= 500
+
 export interface CascadePipelineSettings {
   /**
    * "normal" (default) is a passthrough: one attempt, no override, no guard,
@@ -376,7 +378,7 @@ export class CascadePipeline {
         }
       }
     } catch (e) {
-      void (e instanceof CloudChatError)
+      if (e instanceof CloudChatError && !transientUpstream(e)) throw e
       return sawContent ? "refused" : "empty"
     }
 

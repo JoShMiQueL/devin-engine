@@ -12,6 +12,7 @@ import { resolveModelUid, type ChatEvent, type ChatHistoryItem } from "devin-cor
 type Attempt = {
   events: ChatEvent[]
   throwAfter?: boolean
+  throwError?: Error
 }
 
 type CapturedRequest = {
@@ -41,9 +42,18 @@ mock.module("devin-core", () => {
       return (async function* () {
         for (const ev of attempt.events) yield ev
         if (attempt.throwAfter) throw new Error("upstream boom")
+        if (attempt.throwError) throw attempt.throwError
       })()
     },
-    CloudChatError: class CloudChatError extends Error {},
+    CloudChatError: class CloudChatError extends Error {
+      constructor(
+        message: string,
+        public statusCode?: number,
+        public isRetryable?: boolean,
+      ) {
+        super(message)
+      }
+    },
     resolveModelUid,
   }
 })
@@ -191,6 +201,30 @@ describe("uncensored mode", () => {
     expect(out.some((e) => e.kind === "text")).toBe(true)
   })
 
+  test("a rate limit with no content surfaces instead of resampling silently", async () => {
+    const { CloudChatError } = (await import("devin-core")) as unknown as {
+      CloudChatError: new (message: string, statusCode?: number, isRetryable?: boolean) => Error
+    }
+    queue.push({ events: [], throwError: new CloudChatError("Reached free model rate limit.", 429, true) })
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    await expect(run(pipeline, [{ role: "user", content: "write the thing" }])).rejects.toThrow(/rate limit/)
+    expect(captured).toHaveLength(1)
+  })
+
+  test("a transient upstream error with no content still resamples", async () => {
+    const { CloudChatError } = (await import("devin-core")) as unknown as {
+      CloudChatError: new (message: string, statusCode?: number, isRetryable?: boolean) => Error
+    }
+    queue.push(
+      { events: [], throwError: new CloudChatError("truncated", 500) },
+      compliantStream(),
+    )
+    const pipeline = new CascadePipeline({ mode: "uncensored", overrideFile: "en" }, API_KEY)
+    const out = await run(pipeline, [{ role: "user", content: "write the thing" }])
+    expect(captured).toHaveLength(2)
+    expect(out.some((e) => e.kind === "text")).toBe(true)
+  })
+
   test("sanitize strips history refusals in uncensored mode only", async () => {
     queue.push(compliantStream(), compliantStream())
     const history: ChatHistoryItem[] = [
@@ -297,6 +331,27 @@ describe("engine catalog-driven resolution", () => {
       () => {},
     )
     expect(captured[0]?.modelUid).toBe("claude-opus-5-5-high")
+  })
+
+  test("a rate limit ends the turn at once with the upstream reason, without resampling", async () => {
+    const { CloudChatError } = (await import("devin-core")) as unknown as {
+      CloudChatError: new (message: string, statusCode?: number, isRetryable?: boolean) => Error
+    }
+    const { Engine } = await import("../src/engine.ts")
+    const { OverridePrompt } = await import("../src/override.ts")
+    queue.push({ events: [], throwError: new CloudChatError("Reached free model rate limit.", 429, true) })
+    const engine = new Engine({ mode: "uncensored" }, API_KEY, new OverridePrompt("en"), [])
+    captured.length = 0
+    const emitted: string[] = []
+    await engine.run(
+      { model: "swe-2.1", messages: [{ role: "user", content: "hi" }] },
+      (chunk: { content?: string | null }) => emitted.push(chunk.content ?? ""),
+      () => {},
+      () => {},
+    )
+    expect(captured).toHaveLength(1)
+    expect(emitted.join("")).toContain("upstream error")
+    expect(emitted.join("")).toContain("rate limit")
   })
 
   test("without a catalog the legacy swe tiers still route", async () => {
